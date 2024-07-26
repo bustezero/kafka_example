@@ -23,7 +23,7 @@ jobs:
             target: x86_64-apple-darwin
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            EXTENSION: .exe
+            extension: .exe
 
     runs-on: ${{ matrix.os }}
 
@@ -38,24 +38,24 @@ jobs:
           override: true
 
       - name: Install dependencies (macOS)
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' && matrix.target == 'x86_64-apple-darwin'
         run: |
           brew install llvm
-          echo "::set-env name=CC::$(brew --prefix llvm)/bin/clang"
-          echo "::set-env name=CXX::$(brew --prefix llvm)/bin/clang++"
-          echo "::set-env name=PATH::$(brew --prefix llvm)/bin:$PATH"
+          echo "CC=$(brew --prefix llvm)/bin/clang" >> $GITHUB_ENV
+          echo "CXX=$(brew --prefix llvm)/bin/clang++" >> $GITHUB_ENV
+          echo "$(brew --prefix llvm)/bin" >> $GITHUB_PATH
 
       - uses: actions-rs/cargo@v1
         with:
           use-cross: true
           command: build
-          args: --verbose --release --target=${{ matrix.TARGET }}
+          args: --verbose --release --target=${{ matrix.target }}
 
       - name: Rename
-        run: cp target/${{ matrix.TARGET }}/release/kafka_example${{ matrix.EXTENSION }} kafka_example-${{ matrix.TARGET }}${{ matrix.EXTENSION }}
+        run: cp target/${{ matrix.target }}/release/kafka_example${{ matrix.extension }} kafka_example-${{ matrix.target }}${{ matrix.extension }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@master
         with:
-          name: kafka_example-${{ matrix.TARGET }}${{ matrix.EXTENSION }}
-          path: kafka_example-${{ matrix.TARGET }}${{ matrix.EXTENSION }}
+          name: kafka_example-${{ matrix.target }}${{ matrix.extension }}
+          path: kafka_example-${{ matrix.target }}${{ matrix.extension }}

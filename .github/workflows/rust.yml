@@ -38,7 +38,7 @@ jobs:
           override: true
 
       - name: Install dependencies (macOS)
-        if: matrix.os == 'macos-latest' && matrix.target == 'x86_64-apple-darwin'
+        if: matrix.os == 'macos-latest'
         run: |
           brew install llvm
           echo "::set-env name=CC::$(brew --prefix llvm)/bin/clang"

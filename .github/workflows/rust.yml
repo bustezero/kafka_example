@@ -1,0 +1,61 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "v*.*" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            extension: .exe
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macos-latest' && matrix.target == 'x86_64-apple-darwin'
+        run: |
+          brew install llvm
+          echo "CC=$(brew --prefix llvm)/bin/clang" >> $GITHUB_ENV
+          echo "CXX=$(brew --prefix llvm)/bin/clang++" >> $GITHUB_ENV
+          echo "$(brew --prefix llvm)/bin" >> $GITHUB_PATH
+
+      - uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --verbose --release --target=${{ matrix.target }}
+
+      - name: Rename
+        run: cp target/${{ matrix.target }}/release/kafka_example${{ matrix.extension }} kafka_example-${{ matrix.target }}${{ matrix.extension }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@master
+        with:
+          name: kafka_example-${{ matrix.target }}${{ matrix.extension }}
+          path: kafka_example-${{ matrix.target }}${{ matrix.extension }}

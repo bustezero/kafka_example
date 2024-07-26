@@ -1,29 +1,63 @@
 use axum::{
-    extract::{Json, State},
+    extract::{Json, Query, State},
     routing::{get, post},
     Router,
 };
+use config::{Config, File};
 use env_logger::Builder;
 use log::{error, info, LevelFilter};
+use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::producer::{FutureProducer, FutureRecord};
-use rdkafka::consumer::{StreamConsumer, Consumer};
 use rdkafka::{ClientConfig, Message};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tokio_stream::StreamExt;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct DataChangeEvent {
-    key: String,
-    value: String,
+mod db;
+use db::{DataChangeEvent, DB};
+
+#[derive(Debug, Deserialize)]
+struct WebConfig {
+    listen_address: String,
+    listen_port: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct KafkaConfig {
+    brokers: String,
+    topic: String,
+    group_id: String,
+    message_timeout_ms: String,
+    auto_offset_reset: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct DatabaseConfig {
+    dbname: String,
+    user: String,
+    password: String,
+    host: String,
+    port: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct AppConfig {
+    web: WebConfig,
+    kafka: KafkaConfig,
+    database: DatabaseConfig,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Pagination {
+    page: usize,
+    per_page: usize,
 }
 
 #[derive(Clone)]
 struct AppState {
     producer: FutureProducer,
     consumer: Arc<StreamConsumer>,
-    received_messages: Arc<Mutex<Vec<DataChangeEvent>>>,
+    db: DB,
 }
 
 #[tokio::main]
@@ -31,32 +65,51 @@ async fn main() {
     Builder::new().filter(None, LevelFilter::Info).init();
     info!("Starting the Kafka HTTP server");
 
-    let kafka_brokers = "172.20.19.27:9092";
-    let topic = "data_changes";
-    let group_id = "data_sync_group";
-    let topics = [topic];
+    // 加载配置文件
+    let settings = Config::builder()
+        .add_source(File::with_name("config/kafka_example.yaml"))
+        .build()
+        .unwrap();
+
+    let config: AppConfig = settings.try_deserialize().unwrap();
+
+    let kafka_brokers = &config.kafka.brokers;
+    let topic = &config.kafka.topic;
+    let group_id = &config.kafka.group_id;
+    let message_timeout_ms = &config.kafka.message_timeout_ms;
+    let auto_offset_reset = &config.kafka.auto_offset_reset;
+    let topics = [topic.as_str()];
 
     let producer: FutureProducer = ClientConfig::new()
         .set("bootstrap.servers", kafka_brokers)
-        .set("message.timeout.ms", "5000")
+        .set("message.timeout.ms", message_timeout_ms)
         .create()
         .expect("Producer creation error");
 
     let consumer: StreamConsumer = ClientConfig::new()
         .set("bootstrap.servers", kafka_brokers)
         .set("group.id", group_id)
-        .set("auto.offset.reset", "earliest")
+        .set("auto.offset.reset", auto_offset_reset)
         .create()
         .expect("Consumer creation failed");
 
-    consumer.subscribe(&topics).expect("Failed to subscribe to topics");
+    consumer
+        .subscribe(&topics)
+        .expect("Failed to subscribe to topics");
 
-    let received_messages = Arc::new(Mutex::new(Vec::new()));
+    let db = DB::new(
+        &config.database.dbname,
+        &config.database.user,
+        &config.database.password,
+        &config.database.host,
+        &config.database.port,
+    )
+    .await;
 
     let state = AppState {
         producer,
         consumer: Arc::new(consumer),
-        received_messages: received_messages.clone(),
+        db,
     };
 
     let app = Router::new()
@@ -64,7 +117,10 @@ async fn main() {
         .route("/receive", get(receive_handler))
         .with_state(state.clone());
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let listener_address_port = format!("{}:{}", config.web.listen_address, config.web.listen_port);
+    let listener = tokio::net::TcpListener::bind(listener_address_port)
+        .await
+        .unwrap();
     info!("Listening on {}", listener.local_addr().unwrap());
 
     tokio::select! {
@@ -78,9 +134,15 @@ async fn send_handler(
     Json(event): Json<DataChangeEvent>,
 ) -> Result<Json<&'static str>, String> {
     let payload = serde_json::to_string(&event).unwrap();
-    let record = FutureRecord::to("data_changes").payload(&payload).key(&event.key);
+    let record = FutureRecord::to("data_changes")
+        .payload(&payload)
+        .key(&event.key);
 
-    match state.producer.send(record, std::time::Duration::from_secs(0)).await {
+    match state
+        .producer
+        .send(record, std::time::Duration::from_secs(0))
+        .await
+    {
         Ok(_) => {
             info!("Sent data change event to Kafka: {:?}", event);
             Ok(Json("Message sent successfully"))
@@ -92,9 +154,18 @@ async fn send_handler(
     }
 }
 
-async fn receive_handler(State(state): State<AppState>) -> Json<Vec<DataChangeEvent>> {
-    let received_messages = state.received_messages.lock().await.clone();
-    Json(received_messages)
+async fn receive_handler(
+    State(state): State<AppState>,
+    Query(pagination): Query<Pagination>,
+) -> Result<Json<Vec<DataChangeEvent>>, String> {
+    let events = state
+        .db
+        .get_events(
+            pagination.per_page as i64,
+            (pagination.page * pagination.per_page) as i64,
+        )
+        .await?;
+    Ok(Json(events))
 }
 
 async fn consume_events(state: AppState) {
@@ -102,12 +173,16 @@ async fn consume_events(state: AppState) {
     while let Some(result) = stream.next().await {
         match result {
             Ok(borrowed_message) => {
-                if let Some(payload) = borrowed_message.payload().and_then(|p| std::str::from_utf8(p).ok()) {
+                if let Some(payload) = borrowed_message
+                    .payload()
+                    .and_then(|p| std::str::from_utf8(p).ok())
+                {
                     let event: DataChangeEvent = serde_json::from_str(payload).unwrap();
                     info!("Received data change event: {:?}", event);
 
-                    let mut messages = state.received_messages.lock().await;
-                    messages.push(event);
+                    if let Err(e) = state.db.insert_event(&event).await {
+                        error!("Failed to insert event into DB: {:?}", e);
+                    }
                 }
             }
             Err(e) => error!("Kafka error: {}", e),

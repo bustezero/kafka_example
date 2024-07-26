@@ -1,0 +1,17 @@
+web:
+  listen_address: "0.0.0.0"
+  listen_port: "8080"
+
+kafka:
+  brokers: "172.20.19.27:9092"
+  topic: "data_changes"
+  group_id: "data_sync_group"
+  message_timeout_ms: "5000"
+  auto_offset_reset: "earliest"
+
+database:
+  dbname: "kafka_example"
+  user: "buste"
+  password: "passw0rd"
+  host: "172.20.19.27"
+  port: "5432"

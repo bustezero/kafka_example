@@ -27,7 +27,31 @@ impl DB {
 
         let pool = cfg.create_pool(Some(Runtime::Tokio1), NoTls).unwrap();
 
-        DB { pool }
+        let db = DB { pool };
+
+        // Initialize the database by creating the table
+        db.init().await.expect("Failed to initialize database");
+
+        db
+    }
+
+    pub async fn init(&self) -> Result<(), String> {
+        let client = self.pool.get().await.map_err(|e| e.to_string())?;
+        client
+            .execute(
+                "
+                CREATE TABLE IF NOT EXISTS data_change_events (
+                    id SERIAL PRIMARY KEY,
+                    key VARCHAR(255) NOT NULL,
+                    value TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                ",
+                &[],
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(())
     }
 
     pub async fn insert_event(&self, event: &DataChangeEvent) -> Result<(), String> {

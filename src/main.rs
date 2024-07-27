@@ -12,7 +12,7 @@ mod handlers;
 mod kafka;
 use db::DB;
 use handlers::{consume_events, receive_handler, send_handler, AppState};
-use kafka::{create_consumer, create_producer};
+use kafka::{KafkaClient, KafkaConfig};
 
 #[derive(Debug, Deserialize)]
 struct WebConfig {
@@ -32,7 +32,7 @@ struct DatabaseConfig {
 #[derive(Debug, Deserialize)]
 struct AppConfig {
     web: WebConfig,
-    kafka: kafka::KafkaConfig,
+    kafka: KafkaConfig,
     database: DatabaseConfig,
 }
 
@@ -49,11 +49,8 @@ async fn main() {
 
     let config: AppConfig = settings.try_deserialize().unwrap();
 
-    let topic: &str = &config.kafka.topic;
-    let topics = &[topic];
-
-    let producer = create_producer(&config.kafka);
-    let consumer = create_consumer(&config.kafka, topics);
+    let topics: Vec<&str> = config.kafka.topics.iter().map(String::as_str).collect();
+    let kafka_client = KafkaClient::new(&config.kafka, &topics);
 
     let db = DB::new(
         &config.database.dbname,
@@ -62,11 +59,11 @@ async fn main() {
         &config.database.host,
         &config.database.port,
     )
-    .await;
+        .await;
 
     let state = AppState {
-        producer,
-        consumer,
+        producer: kafka_client.producer,
+        consumer: kafka_client.consumer,
         db,
     };
 

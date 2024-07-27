@@ -4,7 +4,7 @@ web:
 
 kafka:
   brokers: "192.168.123.16:9092"
-  topic: "data_changes"
+  topics: ["data_changes", "orders_create"]  # 修改此行以支持多个 topic
   group_id: "data_sync_group"
   message_timeout_ms: "5000"
   auto_offset_reset: "earliest"

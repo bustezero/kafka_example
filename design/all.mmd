@@ -1,0 +1,38 @@
+graph TD
+    subgraph Main
+        A[Start Kafka HTTP Server] --> B[Load Config File]
+        B --> C{Deserialize Config}
+        C -->|Web Config| D[Initialize Router]
+        C -->|Database Config| G[Initialize Database]
+        D --> L[Set Routes]
+        L --> M[Bind Listener]
+        M --> N[Start Server]
+    end
+
+    subgraph Handlers
+        P[Receive Handler] -->|Query Parameters| Q[Get Events from DB]
+        P --> R[Send Response]
+        S[Send Handler] -->|Json Data| T[Convert to Event]
+        T --> U[Send Event to Kafka]
+        U --> V[Send Response]
+        W[Consume Events] --> X[Read from Kafka Stream]
+        X --> Y[Convert to Event]
+        Y --> Z[Insert Event to DB]
+    end
+
+    subgraph DB
+        C -->|Database Config| G
+        G --> H[Create Connection Pool]
+        H --> I[Initialize Database Table]
+        I --> AA[Insert Event]
+        AA --> AB[Select Events]
+        AB --> AC[Return Events]
+    end
+
+    subgraph Kafka
+        C -->|Kafka Config| Kafka_Init
+        Kafka_Init -->|Create Consumer| F[Create Consumer]
+        Kafka_Init -->|Create Producer| E[Create Producer]
+        F --> AD[Subscribe to Topics]
+        AD --> J[Set Consumer Stream]
+    end

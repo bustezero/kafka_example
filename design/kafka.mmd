@@ -1,0 +1,22 @@
+graph LR
+    subgraph "前端负载均衡器"
+        A[Nginx/HAProxy]
+    end
+    subgraph "服务器"
+        B1[服务器1]
+        B2[服务器2]
+        B3[服务器3]
+    end
+    subgraph "消息队列"
+        C[Kafka]
+    end
+
+    A --> B1
+    A --> B2
+    A --> B3
+    B1 -- 发布事件 --> C
+    B2 -- 发布事件 --> C
+    B3 -- 发布事件 --> C
+    C -- 事件推送 --> B1
+    C -- 事件推送 --> B2
+    C -- 事件推送 --> B3

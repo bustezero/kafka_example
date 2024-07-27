@@ -1,0 +1,47 @@
+graph TD
+    subgraph Clients
+        A[用户A提交买单]
+        B[用户B提交卖单]
+        C[用户C提交买单]
+        D[用户D提交卖单]
+    end
+
+    subgraph Kafka
+        AA[订单生成模块A] --> |订单信息| orders[订单Topic]
+        BB[订单生成模块B] --> |订单信息| orders
+        CC[订单生成模块C] --> |订单信息| orders
+        DD[订单生成模块D] --> |订单信息| orders
+
+        orders --> E[订单处理模块]
+        E --> F[数据库]
+        F --> G[匹配引擎模块]
+        G --> |匹配结果| H[交易表]
+        G --> |通知信息| notifications[通知Topic]
+        notifications --> I[通知模块]
+    end
+
+    subgraph Backend
+        F[数据库]
+        H[交易表]
+    end
+
+    A --> AA
+    B --> BB
+    C --> CC
+    D --> DD
+
+    I --> |通知用户A| JA[用户A]
+    I --> |通知用户B| JB[用户B]
+    I --> |通知用户C| JC[用户C]
+    I --> |通知用户D| JD[用户D]
+
+    subgraph Logs
+        L[日志模块]
+        L --> AA
+        L --> BB
+        L --> CC
+        L --> DD
+        L --> E
+        L --> G
+        L --> I
+    end

@@ -1,0 +1,53 @@
+graph LR
+    A[Client] -->|HTTP Request| B[Axum Web Server 1]
+    A[Client] -->|HTTP Request| C[Axum Web Server 2]
+    B -->|POST /send| D[send_handler 1]
+    C -->|POST /send| E[send_handler 2]
+    B -->|GET /receive| F[receive_handler 1]
+    C -->|GET /receive| G[receive_handler 2]
+    D -->|Send to Kafka| H[Kafka Producer 1]
+    E -->|Send to Kafka| I[Kafka Producer 2]
+    H -->|Kafka Topic: data_changes| J[Kafka Broker 1]
+    I -->|Kafka Topic: data_changes| J
+    J -->|Distribute Messages| K[Kafka Broker Cluster]
+    F -->|Query DB| L[PostgreSQL Database 1]
+    G -->|Query DB| M[PostgreSQL Database 2]
+    K -->|Consume Events| N[Kafka Consumer 1]
+    K -->|Consume Events| O[Kafka Consumer 2]
+    N -->|Stream Events| P[consume_events 1]
+    O -->|Stream Events| Q[consume_events 2]
+    P -->|Insert Event into DB| L
+    Q -->|Insert Event into DB| M
+    P -->|Log Event| R[Logger 1]
+    Q -->|Log Event| S[Logger 2]
+
+    subgraph Axum Web Servers
+        B
+        C
+    end
+
+    subgraph Kafka System
+        H
+        I
+        J
+        K
+        N
+        O
+    end
+
+    subgraph Databases
+        L
+        M
+    end
+
+    subgraph Logger System
+        R
+        S
+    end
+
+    subgraph Axum Handlers
+        D
+        E
+        F
+        G
+    end

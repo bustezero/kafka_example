@@ -10,9 +10,13 @@ use serde::Deserialize;
 mod db;
 mod handlers;
 mod kafka;
+mod market {
+    pub mod order;
+}
 use db::DB;
-use handlers::{consume_events, receive_handler, send_handler, AppState};
+use handlers::{consume_events, receive_handler, send_handler, order_handler, AppState};
 use kafka::{KafkaClient, KafkaConfig};
+// use market::order::Order;
 
 #[derive(Debug, Deserialize)]
 struct WebConfig {
@@ -70,6 +74,7 @@ async fn main() {
     let app = Router::new()
         .route("/send", post(send_handler))
         .route("/receive", get(receive_handler))
+        .route("/order", post(order_handler))  // 新增
         .with_state(state.clone());
 
     let listener_address_port = format!("{}:{}", config.web.listen_address, config.web.listen_port);

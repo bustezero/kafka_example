@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio_stream::StreamExt;
 
+use crate::market::order::{Order};
 use crate::db::{DataChangeEvent, DB};
 
 #[derive(Serialize, Deserialize)]
@@ -81,4 +82,12 @@ pub async fn consume_events(state: AppState) {
             Err(e) => error!("Kafka error: {}", e),
         }
     }
+}
+
+pub async fn order_handler(
+    State(_state): State<AppState>,
+    Json(order): Json<Order>,
+) -> Result<Json<&'static str>, String> {
+    info!("Received order: {:?}", order);
+    Ok(Json("Order received"))
 }

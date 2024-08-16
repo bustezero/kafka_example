@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.39", features = ["full"] }
-rdkafka = { version = "0.36", features = ["tokio", "cmake-build"] }
+rdkafka = { version = "0.36", features = ["tokio"] }
 log = "0.4"
 env_logger = "0.11"
 serde = { version = "1.0", features = ["derive"] }
@@ -17,5 +17,7 @@ tokio-postgres = "0.7"
 deadpool-postgres = "0.14"
 config = "0.14"
 
-
-
+[target.'cfg(target_os = "windows")'.dependencies]
+rdkafka = { version = "0.36", features = ["tokio", "cmake-build"] }
+[target.'cfg(target_os = "macos")'.dependencies]
+rdkafka = { version = "0.36", features = ["tokio", "cmake-build"] }

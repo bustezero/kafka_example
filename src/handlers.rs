@@ -23,6 +23,12 @@ pub struct AppState {
     pub db: DB,
 }
 
+#[derive(Serialize)]
+pub struct EventsResponse {
+    events: Vec<DataChangeEvent>,
+    page: usize,
+}
+
 pub async fn send_handler(
     State(state): State<AppState>,
     Json(event): Json<DataChangeEvent>,
@@ -51,7 +57,7 @@ pub async fn send_handler(
 pub async fn receive_handler(
     State(state): State<AppState>,
     Query(pagination): Query<Pagination>,
-) -> Result<Json<Vec<DataChangeEvent>>, String> {
+) -> Result<Json<EventsResponse>, String> {
     let events = state
         .db
         .get_events(
@@ -59,7 +65,11 @@ pub async fn receive_handler(
             (pagination.page * pagination.per_page) as i64,
         )
         .await?;
-    Ok(Json(events))
+    let response = EventsResponse {
+        events,
+        page: pagination.page,
+    };
+    Ok(Json(response))
 }
 
 pub async fn consume_events(state: AppState) {

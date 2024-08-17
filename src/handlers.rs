@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio_stream::StreamExt;
 
-use crate::market::order::{Order};
 use crate::db::{DataChangeEvent, DB};
+use crate::market::order::Order;
 
 #[derive(Serialize, Deserialize)]
 pub struct Pagination {
@@ -60,7 +60,7 @@ pub async fn receive_handler(
 ) -> Result<Json<EventsResponse>, String> {
     let events = state
         .db
-        .get_events(
+        .list_events(
             pagination.per_page as i64,
             (pagination.page * pagination.per_page) as i64,
         )

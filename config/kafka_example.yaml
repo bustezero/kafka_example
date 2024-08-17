@@ -15,3 +15,4 @@ database:
   password: "passw0rd"
   host: "192.168.123.16"
   port: "5432"
+  clean_db: False

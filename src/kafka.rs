@@ -1,8 +1,8 @@
-use std::sync::Arc;
 use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::producer::FutureProducer;
 use rdkafka::ClientConfig;
 use serde::Deserialize;
+use std::sync::Arc;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct KafkaConfig {

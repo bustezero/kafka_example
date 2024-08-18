@@ -1,4 +1,5 @@
 use axum::{
+    middleware,
     routing::{get, post},
     Router,
 };
@@ -9,12 +10,17 @@ use serde::Deserialize;
 
 mod db;
 mod handlers;
+mod interceptors;
 mod kafka;
+
 mod market {
     pub mod order;
 }
 use db::DB;
-use handlers::{consume_events, order_handler, receive_handler, send_handler, AppState};
+use handlers::{
+    consume_events, order_create_handler, order_test_handler, receive_handler, send_handler,
+    AppState,
+};
 use kafka::{KafkaClient, KafkaConfig};
 // use market::order::Order;
 
@@ -74,9 +80,13 @@ async fn main() {
     };
 
     let app = Router::new()
+        // For Test
         .route("/send", post(send_handler))
         .route("/receive", get(receive_handler))
-        .route("/order", post(order_handler)) // 新增
+        // For Order
+        .route("/order", get(order_test_handler))
+        .route("/order", post(order_create_handler))
+        .layer(middleware::from_fn(interceptors::log_request)) // 应用中间件
         .with_state(state.clone());
 
     let listener_address_port = format!("{}:{}", config.web.listen_address, config.web.listen_port);

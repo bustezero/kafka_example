@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use deadpool_postgres::{Config, ManagerConfig, Pool, RecyclingMethod, Runtime};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use tokio_postgres::NoTls;
 
@@ -11,14 +12,14 @@ pub struct DataChangeEvent {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Order {
-    pub order_id: String, // Changed to String
+    pub order_id: Option<uuid::Uuid>, // Changed to String
     pub order_type: String,
     pub product_type: String,
     pub quantity: i32,
-    pub price: f64,
+    pub price: Decimal,
     pub status: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Clone)]
@@ -165,8 +166,8 @@ impl DB {
                     &order.order_id,
                     &order.order_type,
                     &order.product_type,
-                    &(order.quantity as i32),
-                    &(order.price as f64),
+                    &order.quantity,
+                    &order.price,
                     &order.status,
                     &order.created_at,
                     &order.updated_at,

@@ -7,8 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio_stream::StreamExt;
 
-use crate::db::{DataChangeEvent, DB};
-use crate::market::order::Order;
+use crate::db::{DataChangeEvent, Order, DB};
 
 #[derive(Serialize, Deserialize)]
 pub struct Pagination {
@@ -94,10 +93,22 @@ pub async fn consume_events(state: AppState) {
     }
 }
 
-pub async fn order_handler(
+pub async fn order_test_handler(
     State(_state): State<AppState>,
     Json(order): Json<Order>,
 ) -> Result<Json<&'static str>, String> {
     info!("Received order: {:?}", order);
     Ok(Json("Order received"))
+}
+
+pub async fn order_create_handler(
+    State(state): State<AppState>,
+    Json(order): Json<Order>,
+) -> Result<Json<&'static str>, String> {
+    info!("order_create_handler: {:?}", order);
+    if let Err(e) = state.db.insert_order(&order).await {
+        error!("Failed to insert order into DB: {:?}", e);
+        return Err(format!("Failed to insert order into DB: {:?}", e));
+    }
+    Ok(Json("Order created"))
 }
